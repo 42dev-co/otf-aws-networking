@@ -1,0 +1,58 @@
+# Route53 Endpoints
+route53_endpoints:
+  create: false
+
+  # Each inbound and outbound endpoint cost $0.40 per hour approximately $292.80 per month
+  inbound:
+    network_account:
+      create: false
+      whitelist_cidr_blocks: 
+        ipv4:
+          - "10.0.0.0/8"
+        ipv6:
+          - "::/0"
+      # security_group_ids: [ "sg-0f2250e719d760a63" ] # route53resolver custom security group example
+      ip_addresses:
+        ap-southeast-1a:
+          subnet_id: public_subnet_a_1  
+        ap-southeast-1b:
+          subnet_id: public_subnet_b_2 
+        ap-southeast-1c:
+          subnet_id: public_subnet_c_3  
+  outbound:
+    network_account:
+      create: false
+      whitelist_cidr_blocks: 
+        ipv4:
+          - "10.0.0.0/8"
+        ipv6:
+          - "::/0"
+      # security_group_ids: ["sg-06168d39fc15d8b62"] # route53resolver custom security group example
+      ip_addresses: # Note: specify subnets that're able to connect to Internet through NAT Gateway
+        ap-southeast-1a:
+          subnet_id: public_subnet_a_1
+        ap-southeast-1b:
+          subnet_id: public_subnet_b_2
+        ap-southeast-1c:
+          subnet_id: public_subnet_c_3
+  rules:
+    forward_google:
+      domain_name: google.com.
+      resolver_outbound_endpoint: network_account
+      target_ips: 
+        "8.8.8.8": 53
+        "8.8.4.4": 53
+      associate_default_vpc: true
+    forward_42devco:
+      domain_name: 42dev.co
+      resolver_outbound_endpoint: network_account
+      target_ips: 
+        "10.31.16.189": 53
+        "10.31.17.90": 53
+      associate_default_vpc: true
+    forward_example_com:
+      domain_name: example.com
+      resolver_outbound_endpoint: network_account
+      target_ips: 
+        "10.80.37.230": 53
+      associate_default_vpc: true

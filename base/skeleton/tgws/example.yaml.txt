@@ -1,0 +1,35 @@
+tgw-name:
+  create: false
+  description: "Some Transit Gateway"
+  auto_accept_shared_attachments: enable
+  principals:
+    - "0123456789" # shared staging account
+  peering_attachments: 
+    # Send Peering Attachment Request To
+    staging_au_tgw:
+      create: false
+      peer_region: "ap-southeast-2"
+      peer_transit_gateway_id: "tgw-0f54f71d9e0c6c4fd"
+  peering_attachment_accepters:
+    # Accept Peering Attachment Request From
+    staging_sg_tgw:
+      accept: false
+      transit_gateway_attachment_id: "tgw-attach-067d9669ec83ac204"
+  vpc_attachments:
+    devops-vpc:
+      create: false
+      vpc_id: vpc-00d8262f566be45ac # devops-vpc
+      # Set true to all TGW manage routing automatically, default to `true`
+      transit_gateway_default_route_table_association: true 
+      transit_gateway_default_route_table_propagation: true 
+      subnet_ids:
+        - subnet-033dde306ffef69a3 # devops_private_subnet_a_1
+        - subnet-049d8202c2bf1ca17 # devops_private_subnet_b_2
+        - subnet-03daab28db8d6739b # devops_private_subnet_c_3
+  vpc_attachment_accepters: 
+    staging_au:
+      accept: false
+      # Set true to all TGW manage routing automatically, default to `true`
+      transit_gateway_default_route_table_association: true 
+      transit_gateway_default_route_table_propagation: true 
+      transit_gateway_attachment_id: tgw-attach-01df1c12a9c8c8203

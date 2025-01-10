@@ -1,0 +1,14 @@
+corporate_offices:
+  # Available options: IPV4, IPV6
+  address_family: "IPV4"
+  
+  # max_entries must be <= 1000
+  max_entries: 10
+  
+  entries:
+    office_a: 
+      cidr: "192.168.1.0/24"
+      description: "Corporate Office A"
+    office_b:
+      cidr: "192.168.2.0/24"
+      description: "Corporate Office B"

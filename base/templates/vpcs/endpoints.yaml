@@ -1,0 +1,108 @@
+# This file already precreate some common endpoints for the VPCs.
+# Some are free and some are not. You can enable or disable the endpoints by setting `create: true` or `create: false`
+# You can also add custom endpoints by following the existing endpoints.
+# `{{region}}` will be replaced by the region of the VPC automatically.
+common_endpoints: 
+  gateway_endpoints:
+    s3-vpc-endpoint:
+      service_name: "com.amazonaws.{{region}}.s3"
+      route_table_ids:
+        - public-rtb
+        - private-rtb
+    dynamodb-vpc-endpoint:
+      service_name: "com.amazonaws.{{region}}.dynamodb"
+      route_table_ids:
+        - public-rtb
+        - private-rtb
+  # Each enpoint cost $0.01 per GB (for first 1PB) and the inteface endpoint cost approximately $28.47 per month
+  # enable the endpoint only if you need it, by setting `create: true`
+  interface_endpoints:
+    cloudwatch-logs-vpc-endpoint:
+      create: false
+      service_name: "com.amazonaws.{{region}}.logs"
+      security_group_ids: ["cloudwatch_logs_security_group"] 
+      subnet_ids:
+        - private_subnet_a_1
+        - private_subnet_b_2
+        - private_subnet_c_3
+    cloudwatch-metrics-vpc-endpoint:
+      create: false
+      service_name: "com.amazonaws.{{region}}.monitoring"
+      security_group_ids: ["cloudwatch_metrics_security_group"]
+      subnet_ids:
+        - private_subnet_a_1
+        - private_subnet_b_2
+        - private_subnet_c_3
+    secrets-manager-vpc-endpoint:
+      create: false
+      service_name: "com.amazonaws.{{region}}.secretsmanager"
+      security_group_ids: ["secrets_manager_security_group"]
+      subnet_ids:
+        - private_subnet_a_1
+        - private_subnet_b_2
+        - private_subnet_c_3
+    ssm-vpc-endpoint:
+      create: false
+      service_name: "com.amazonaws.{{region}}.ssm"
+      security_group_ids: ["ssm_security_group"]
+      subnet_ids:
+        - private_subnet_a_1
+        - private_subnet_b_2
+        - private_subnet_c_3
+    ec2messages-vpc-endpoint:
+      create: false
+      service_name: "com.amazonaws.{{region}}.ec2messages"
+      security_group_ids: ["ec2messages_security_group"]
+      subnet_ids:
+        - private_subnet_a_1
+        - private_subnet_b_2
+        - private_subnet_c_3
+    ssmmessages:
+      create: false
+      service_name: "com.amazonaws.{{region}}.ssmmessages"
+      security_group_ids: ["ssmmessages_security_group"]
+      subnet_ids:
+        - private_subnet_a_1
+        - private_subnet_b_2
+        - private_subnet_c_3
+    ecr-api-vpc-endpoint:
+      create: false
+      service_name: "com.amazonaws.{{region}}.ecr.api"
+      security_group_ids: ["ecr_api_security_group"]
+      subnet_ids:
+        - private_subnet_a_1
+        - private_subnet_b_2
+        - private_subnet_c_3
+    ecr-dkr-vpc-endpoint:
+      create: false
+      service_name: "com.amazonaws.{{region}}.ecr.dkr"
+      security_group_ids: ["ecr_dkr_security_group"]
+      subnet_ids:
+        - private_subnet_a_1
+        - private_subnet_b_2
+        - private_subnet_c_3
+    kms-vpc-endpoint:
+      create: false
+      service_name: "com.amazonaws.{{region}}.kms"
+      security_group_ids: ["kms_security_group"]
+      subnet_ids:
+        - private_subnet_a_1
+        - private_subnet_b_2
+        - private_subnet_c_3
+    sns-vpc-endpoint:
+      create: false
+      service_name: "com.amazonaws.{{region}}.sns"
+      security_group_ids: ["sns_security_group"]
+      subnet_ids:
+        - private_subnet_a_1
+        - private_subnet_b_2
+        - private_subnet_c_3
+    sqs-vpc-endpoint:
+      create: false
+      service_name: "com.amazonaws.{{region}}.sqs"
+      security_group_ids: ["sqs_security_group"]
+      subnet_ids:
+        - private_subnet_a_1
+        - private_subnet_b_2
+        - private_subnet_c_3
+    

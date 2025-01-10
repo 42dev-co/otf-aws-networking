@@ -1,0 +1,434 @@
+version: '3'
+dotenv: ['setup.config']
+
+env:
+  # Get the Project name from the current directory
+  PROJECT: 
+    sh: "basename {{.PWD}}"
+  
+  # Was planning to support docker and rancher desktop. 
+  CMD:
+    sh: (which nerdctl > /dev/null 2>&1 && echo "nerdctl" || echo "docker")
+
+  # OpenTofu image version
+  IMAGE:  "ghcr.io/opentofu/opentofu:${TF_VERSION}"
+  
+  # Thanks to hairyhenderson for gomplate, we are using it as our templater tool
+  TEMPLATER: hairyhenderson/gomplate
+  
+  # Determine the platform based on the architecture
+  PLATFORM: 
+    sh: (case $(uname -m) in x86_64) echo "linux/amd64" ;; arm64 | aarch64) echo "linux/arm64" ;; arm*) echo "linux/arm/v7" ;; *) echo "Unsupported platform" && exit 1 ;; esac)
+  
+  # OPA does not work on snapdragon x elite with arm64. Use amd64 instead to suppress error.
+  OPA: "docker run --platform linux/amd64 --rm -v $(pwd):/workspace -w /workspace openpolicyagent/opa:latest"
+  
+  # Infracost requires a key to be set in the config file.
+  # You may need to adjust infracost command to suit your situation,
+  # by editing the where the config file is mounted
+  # Take note that 42dev.co has public infracost image support multiple platforms including arm64
+  # If you do not trust the image, you can build your own image or use the official infracost image
+  INFRACOST: "docker run --rm -v $(pwd)/tmp:/workspace -v ${HOME}/.config/infracost:/root/.config/infracost -w /workspace registry.gitlab.com/42dev_pub/apps-pub/infracost"
+
+  # Mikefarah's yq is to consolidate data in the config yamls for rendering the templates
+  YQ: "docker run --rm -v $(pwd):/workspace -w /workspace mikefarah/yq:latest"
+
+tasks:
+  default:
+    desc: "List all tasks"
+    silent: true
+    cmds:
+      - task --list
+
+  debug:
+    desc: "Print out viarables set before exexuting tasks"
+    silent: true
+    cmds:
+      - |
+        echo "TIER:{{.TIER}}"
+        echo "TF_VERSION:{{.TF_VERSION}}"
+        echo "DOMAIN:{{.DOMAIN}}"
+        echo "CMD:{{.CMD}}"
+        echo "IMAGE:{{.IMAGE}}"
+        echo "PLATFORM:{{.PLATFORM}}"
+
+  shell:
+    desc: "Run a shell in the container: Requires: account. Optional region, group"
+    silent: true
+    vars:
+      account: '{{default "" .account}}'
+      region: '{{default "ap-southeast-1" .region}}'
+      group: '{{default "" .group}}'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      COMMAND: '{{.CMD}} run --platform {{.PLATFORM}} --rm -it -e USER=$(id -u) -e GROUP=$(id -g) -e AWS_PROFILE={{.account}} -v {{.HOME}}/.aws:/root/.aws -v {{.HOME}}/.gitconfig:/root/.gitconfig -v {{.PWD}}:/tf -v {{.PWD}}/local_modules:/tf/workspaces/{{.WS_PATH}}/local_modules -w /tf/workspaces/{{.WS_PATH}} --entrypoint \"\" {{.IMAGE}}'
+    cmds:
+      - |
+        [ "{{.account}}" ] || { echo "account is required."; exit 1; }
+        [ "{{.TIER}}" -ge 2 ] && [ -z "{{.region}}" ] && echo "REGION is required." && exit 1 || true
+        [ "{{.TIER}}" -eq 3 ] && [ -z "{{.region}}" ] && echo "GROUP is required." && exit 1 || true
+        echo "{{.account}}"
+        [ "{{.TIER}}" -ge 2 ] && echo "{{.region}}"
+        [ "{{.TIER}}" -eq 3 ] && echo "{{.group}}"
+        echo "WORKSPACE_PATH: {{.WS_PATH}}"
+        echo "COMMAND: {{.COMMAND}}"
+        eval "{{.COMMAND}}" /bin/sh
+        eval "{{.COMMAND}}" chown -R $(id -u):$(id -g) .
+
+  init:
+    desc: "Run init. Requires: account. Optional region, group"
+    silent: true
+    cmds:
+      - task: tofu-cmd
+        vars:
+          cmd: "tofu init"
+          account: '{{default "" .account}}'
+          region: '{{default "ap-southeast-1" .region}}'
+          group: '{{default "" .group}}'
+
+  tofu-plan:
+    desc: "Run plan. Requires: account. Optional region, group"
+    silent: true
+    vars:
+      account: '{{default "" .account}}'
+      region: '{{default "ap-southeast-1" .region}}'
+      group: '{{default "" .group}}'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      COMMAND: '{{.CMD}} run --platform {{.PLATFORM}} --rm -it -e USER=$(id -u) -e GROUP=$(id -g) -e AWS_PROFILE={{.account}} -v {{.HOME}}/.aws:/root/.aws -v {{.HOME}}/.gitconfig:/root/.gitconfig -v {{.PWD}}:/tf -v {{.PWD}}/local_modules:/tf/workspaces/{{.WS_PATH}}/local_modules -w /tf/workspaces/{{.WS_PATH}} --entrypoint \"\" {{.IMAGE}}'
+    cmds:
+      - |
+        [ "{{.account}}" ] || { echo "account is required."; exit 1; }
+        [ "{{.TIER}}" -ge 2 ] && [ -z "{{.region}}" ] && echo "REGION is required." && exit 1 || true
+        [ "{{.TIER}}" -eq 3 ] && [ -z "{{.region}}" ] && echo "GROUP is required." && exit 1 || true
+        echo "ACCOUNT: {{.account}}"
+        [ "{{.TIER}}" -ge 2 ] && echo "REGION: {{.region}}"
+        [ "{{.TIER}}" -eq 3 ] && echo "GROUP: {{.group}}"
+        echo "WORKSPACE_PATH: {{.WS_PATH}}"
+        # if plan.tfplan and plan.json exists, remove them
+        [ -f "tmp/plan.tfplan" ] && rm tmp/plan.tfplan || true
+        [ -f "tmp/plan.json" ] && rm tmp/plan.json || true
+        [ -f "tm/cost.json" ] && rm tmp/cost.json || true
+        eval "{{.COMMAND}}" tofu plan -out=/tf/tmp/plan.tfplan 
+        eval "{{.COMMAND}}" tofu show -json /tf/tmp/plan.tfplan > tmp/plan.json
+        eval "{{.COMMAND}}" tofu show -json /tf/tmp/plan.tfplan > tmp/plan.json
+
+  apply:
+    desc: "Run apply. Requires: account. Optional region, group"
+    silent: true
+    vars:
+      account: '{{default "" .account}}'
+      region: '{{default "ap-southeast-1" .region}}'
+      group: '{{default "" .group}}'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      COMMAND: '{{.CMD}} run --platform {{.PLATFORM}} --rm -it -e USER=$(id -u) -e GROUP=$(id -g) -e AWS_PROFILE={{.account}} -v {{.HOME}}/.aws:/root/.aws -v {{.HOME}}/.gitconfig:/root/.gitconfig -v {{.PWD}}:/tf -v {{.PWD}}/local_modules:/tf/workspaces/{{.WS_PATH}}/local_modules -w /tf/workspaces/{{.WS_PATH}} --entrypoint \"\" {{.IMAGE}}'
+    cmds:
+      - |
+        [ "{{.account}}" ] || { echo "account is required."; exit 1; }
+        [ "{{.TIER}}" -ge 2 ] && [ -z "{{.region}}" ] && echo "REGION is required." && exit 1 || true
+        [ "{{.TIER}}" -eq 3 ] && [ -z "{{.region}}" ] && echo "GROUP is required." && exit 1 || true
+        [ -f "tmp/plan.tfplan" ] || { echo "Plan file does not exist."; exit 1; }
+        echo "ACCOUNT: {{.account}}"
+        [ "{{.TIER}}" -ge 2 ] && echo "REGION: {{.region}}"
+        [ "{{.TIER}}" -eq 3 ] && echo "GROUP: {{.group}}"
+        echo "WORKSPACE_PATH: {{.WS_PATH}}"
+        eval "{{.COMMAND}}" tofu apply -auto-approve /tf/tmp/plan.tfplan
+        eval "{{.COMMAND}}" rm /tf/tmp/plan.tfplan /tf/tmp/plan.json /tf/tmp/cost.json
+
+  refresh:
+    desc: "Run refresh. Requires: account. Optional region, group"
+    silent: true
+    cmds:
+      - task: tofu-cmd
+        vars:
+          cmd: "tofu refresh"
+          account: '{{default "" .account}}'
+          region: '{{default "ap-southeast-1" .region}}'
+          group: '{{default "" .group}}'
+
+  state-list:
+    desc: "Run state list. Requires: account. Optional region, group"
+    silent: true
+    cmds:
+      - task: tofu-cmd
+        vars:
+          cmd: "tofu state list"
+          account: '{{default "" .account}}'
+          region: '{{default "ap-southeast-1" .region}}'
+          group: '{{default "" .group}}'
+
+  show:
+    desc: "Run tofu show. Requires: account. Optional region, group"
+    silent: true
+    cmds:
+      - task: tofu-cmd
+        vars:
+          cmd: "tofu show"
+          account: '{{default "" .account}}'
+          region: '{{default "ap-southeast-1" .region}}'
+          group: '{{default "" .group}}'
+
+  tofu-cmd:
+    internal: true
+    desc: "Generic tofu command wrapper"
+    vars:
+      cmd: '{{default "" .cmd}}'
+      account: '{{default "" .account}}'
+      region: '{{default "ap-southeast-1" .region}}'
+      group: '{{default "" .group}}'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      COMMAND: '{{.CMD}} run --platform {{.PLATFORM}} --rm -it -e USER=$(id -u) -e GROUP=$(id -g) -e AWS_PROFILE={{.account}} -v {{.HOME}}/.aws:/root/.aws -v {{.HOME}}/.gitconfig:/root/.gitconfig -v {{.PWD}}:/tf -v {{.PWD}}/local_modules:/tf/workspaces/{{.WS_PATH}}/local_modules -w /tf/workspaces/{{.WS_PATH}} --entrypoint \"\" {{.IMAGE}}'
+    cmds:
+      - |
+        [ "{{.cmd}}" ] || { echo "cmd is required."; exit 1; }
+        [ "{{.account}}" ] || { echo "account is required."; exit 1; }
+        [ "{{.TIER}}" -ge 2 ] && [ -z "{{.region}}" ] && echo "REGION is required." && exit 1 || true
+        [ "{{.TIER}}" -eq 3 ] && [ -z "{{.region}}" ] && echo "GROUP is required." && exit 1 || true
+        echo "ACCOUNT: {{.account}}"
+        [ "{{.TIER}}" -ge 2 ] && echo "REGION: {{.region}}"
+        [ "{{.TIER}}" -eq 3 ] && echo "GROUP: {{.group}}"
+        echo "WORKSPACE_PATH: {{.WS_PATH}}"
+        eval "{{.COMMAND}}" {{.cmd}}
+
+  infracost:
+    desc: "Run infracost"
+    internal: true
+    silent: true
+    cmds:
+      - |
+        [ -f "tmp/plan.tfplan" ] || { echo "Plan file does not exist."; exit 1; }
+        # docker run --rm -it -v $(pwd)/tmp:/workspace -v ${HOME}/.config/infracost:/root/.config/infracost -w /workspace --entrypoint /bin/sh registry.gitlab.com/42dev_pub/apps-pub/infracost 
+        {{.INFRACOST}} breakdown  --project-name="{{.PROJECT}}" --path plan.json --format json --out-file cost.json
+        {{.INFRACOST}} breakdown  --project-name="{{.PROJECT}}" --show-skipped --path plan.json
+
+  infracost-shell:
+    desc: "Run infracost"
+    internal: true
+    silent: true
+    cmds:
+      - |
+        [ -f "tmp/plan.tfplan" ] || { echo "Plan file does not exist."; exit 1; }
+        docker run --rm -it -v $(pwd)/tmp:/workspace -v ${HOME}/.config/infracost:/root/.config/infracost -w /workspace --entrypoint /bin/bash registry.gitlab.com/42dev_pub/apps-pub/infracost 
+
+  plan:
+    desc: "Run plan. Requires: account. Optional region, group"
+    cmds:
+      - task: tofu-plan
+      - task: infracost
+      - task: check-violations
+
+  # Subtask for running compliance and budget checks
+  check-violations:
+    internal: false
+    desc: "Check for compliance and budget violations"
+    cmds:
+      - task: compliance-check
+      - task: budget-check
+
+  # Compliance check
+  compliance-check:
+    internal: true
+    silent: true
+    desc: "Check for compliance violations"
+    cmds:
+      - |
+        violations=$({{.OPA}} eval --format pretty --data policies/iac --input tmp/plan.json "data.iac.main.violations")
+        if [ "$violations" != "{}" ]; then
+          echo "Compliance violations detected:"
+          echo "$violations"
+          rm tmp/plan.tfplan tmp/plan.json tmp/cost.json
+          exit 1
+        else
+          echo "No compliance violations detected."
+        fi
+
+  # Budget check
+  budget-check:
+    desc: "Check for budget violations"
+    silent: true
+    cmds:
+      - |
+        violations=$({{.OPA}} eval --format pretty --data policies/budget --input tmp/cost.json "data.budget.deny")
+        if [ "$violations" != "[]" ]; then
+          echo "Budget violations detected:"
+          echo "$violations"
+          rm tmp/plan.tfplan tmp/plan.json tmp/cost.json
+          exit 1
+        else
+          echo "No budget violations detected."
+        fi
+
+  update-auto:
+    silent: true
+    desc: "Update *.auto.tf files from base to workspace. Requires: account, account_id. Optional region, group"
+    vars:
+      account: '{{default "" .account}}'
+      account_id: '{{default "" .account_id}}'
+      region: '{{default "ap-southeast-1" .region}}'
+      group: '{{default "" .group}}'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      KEY_PATH: '$(case ${TIER} in 1) echo "{{.account}}/{{.PROJECT}}" ;; 2) echo "{{.account}}/{{.PROJECT}}/{{.region}}" ;; 3) echo "{{.account}}/{{.PROJECT}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      RELATIVE_WS_PATH: '$(case "${TIER}" in 1) echo "../..";; 2) echo "../../..";; 3) echo "../../../../";; esac)'
+      RENDER: '{{.CMD}} run --platform {{ .PLATFORM }} --user $(id -u):$(id -g) --rm -it -v {{.PWD}}:/tf -w /tf {{.TEMPLATER}}'
+    cmds:
+      - |
+        # Check if required variables are set, some have default values
+        [ "{{.account}}" ]    || { echo "account is required."; exit 1; }
+        [ "{{.TIER}}" -ge 2 ] && [ -z "{{.region}}" ] && echo "region is required." && exit 1 || true
+        [ "{{.TIER}}" -eq 3 ] && [ -z "{{.region}}" ] && [ -z "{{.group}}" ] && echo "group is required." && exit 1 || true
+
+        # Find and remove all auto.tf files in workspaces/{{.WS_PATH}}
+        find workspaces/{{.WS_PATH}} -type l -name "*.auto.tf" -exec rm {} \;
+        
+        # if workspaces/{{.WS_PATH}}/*.auto.tf does not exist, link it from /base/auto/*.auto.tf files. 
+        auto_files=$(find ./base/auto -type f -name "*.auto.tf")
+        for file in $auto_files; do
+          [ -f "workspaces/{{.WS_PATH}}/$(basename $file)" ] || ( cd workspaces/{{.WS_PATH}}; ln -s {{.RELATIVE_WS_PATH}}/$file . )
+        done
+        
+        echo "Auto.tf files updated."
+
+  scaffold:
+    desc: "Scaffold a workspace. Requires: account, account_id. Optional region, group"
+    silent: true
+    vars:
+      account: '{{default "" .account}}'
+      account_id: '{{default "" .account_id}}'
+      region: '{{default "ap-southeast-1" .region}}'
+      group: '{{default "" .group}}'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      KEY_PATH: '$(case ${TIER} in 1) echo "{{.account}}/{{.PROJECT}}" ;; 2) echo "{{.account}}/{{.PROJECT}}/{{.region}}" ;; 3) echo "{{.account}}/{{.PROJECT}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      RELATIVE_WS_PATH: '$(case "${TIER}" in 1) echo "../..";; 2) echo "../../..";; 3) echo "../../../../";; esac)'
+      RENDER: '{{.CMD}} run --platform {{ .PLATFORM }} --user $(id -u):$(id -g) --rm -it -v {{.PWD}}:/tf -w /tf {{.TEMPLATER}}'
+    cmds:
+      - |
+        # Check if required variables are set, some have default values
+        [ "{{.account}}" ]    || { echo "account is required."; exit 1; }
+        [ "{{.account_id}}" ] || { echo "account_id is required."; exit 1; }
+        [ "{{.TIER}}" -ge 2 ] && [ -z "{{.region}}" ] && echo "region is required." && exit 1 || true
+        [ "{{.TIER}}" -eq 3 ] && [ -z "{{.region}}" ] && [ -z "{{.group}}" ] && echo "group is required." && exit 1 || true
+        
+        # Create workspace and setup essential files for it
+        [ -d "workspaces/{{.WS_PATH}}" ] && echo "Workspace already exists." && exit 1 || mkdir -p workspaces/{{.WS_PATH}}
+        [ -d "workspaces/{{.WS_PATH}}/local_modules" ]  || ( cd workspaces/{{.WS_PATH}}; ln -s {{.RELATIVE_WS_PATH}}/local_modules . )
+        # [ -f "workspaces/{{.WS_PATH}}/auto.tf" ]   	   || ( cd workspaces/{{.WS_PATH}}; ln -s {{.RELATIVE_WS_PATH}}/base/auto.tf . )
+        # if workspaces/{{.WS_PATH}}/*.auto.tf does not exist, link it from /base/auto/*.auto.tf files. 
+        auto_files=$(find ./base/auto -type f -name "*.auto.tf")
+        for file in $auto_files; do
+          [ -f "workspaces/{{.WS_PATH}}/$(basename $file)" ] || ( cd workspaces/{{.WS_PATH}}; ln -s {{.RELATIVE_WS_PATH}}/$file . )
+        done
+        [ -f "workspaces/{{.WS_PATH}}/main.tf" ]   	   || ( touch ./workspaces/{{.WS_PATH}}/main.tf )
+        [ -f "workspaces/{{.WS_PATH}}/vars.tf" ]   	   || ( cp ./base/vars.tf ./workspaces/{{.WS_PATH}}/ ) 
+        [ -d "workspaces/{{.WS_PATH}}/resources" ] 	   || ( mkdir -p ./workspaces/{{.WS_PATH}}/resources ; cp -r ./base/skeleton/* ./workspaces/{{.WS_PATH}}/resources ) 
+        
+        # Save scaffold configuration to config.yaml
+        [ -f "workspaces/{{.WS_PATH}}/config.yaml" ] || touch ./workspaces/{{.WS_PATH}}/config.yaml
+        KEY_PATH="{{.KEY_PATH}}"
+        {{.YQ}} e '.ACCOUNT = "{{.account}}" | .ACCOUNT_ID = "{{.account_id}}" | .REGION = "{{.region}}" | .GROUP = "{{.group}}" | .PROJECT = "{{.PROJECT}}" | .DOMAIN = "{{.DOMAIN}}" | .TIER = "{{.TIER}}"' -i ./workspaces/{{.WS_PATH}}/config.yaml
+        {{.YQ}} e  ".KEY_PATH = \"${KEY_PATH}\"" -i ./workspaces/{{.WS_PATH}}/config.yaml
+        
+        # Render files
+        {{.RENDER}} -c .=/tf/workspaces/{{.WS_PATH}}/config.yaml -f /tf/base/provider.tf.tmpl -o /tf/workspaces/{{.WS_PATH}}/provider.tf    
+        {{.RENDER}} -c .=/tf/workspaces/{{.WS_PATH}}/config.yaml -f /tf/base/templates/settings/main.yaml.tmpl -o /tf/workspaces/{{.WS_PATH}}/resources/settings/main.yaml     
+        [ "{{.TIER}}" -ge 2 ] && {{.RENDER}} -c .=/tf/./workspaces/{{.WS_PATH}}/config.yaml -f /tf/base/terraform.auto.tfvars.tmpl -o /tf/workspaces/{{.WS_PATH}}/terraform.auto.tfvars  || true
+        echo "Scaffold complete."
+
+  unscaffold:
+    desc: "Unscaffold a workspace. Requires: account. Optional region, group"
+    silent: true
+    vars:
+      account: '{{default "" .account}}'
+      region: '{{default "ap-southeast-1" .region}}'
+      GROUP: '{{default "" .region}}'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+    cmds:
+      - |
+        [ "{{.account}}" ] || ( echo "ACCOUNT is required."; exit 1 )
+        [ "{{.TIER}}" -ge 2 ] && [ -z "{{.region}}" ] && echo "REGION is required." && exit 1 || true
+        [ "{{.TIER}}" -eq 3 ] && [ -z "{{.region}}" ] && echo "GROUP is required." && exit 1 || true
+        [ -d "workspaces/{{.WS_PATH}}" ] || { echo "Workspace does not exist."; exit 1;  }
+        rm -rf workspaces/{{.WS_PATH}}
+        echo "Workspace (workspaces/{{.WS_PATH}}) unscaffolded."
+
+  ### OPA Tasks
+  opa-check:
+    desc: "Run rego check. Requires: rego_path:<relative path to rego file e.g. policies/iac/compliances/terraform.rego>"
+    silent: false
+    vars:
+      rego_file: '{{default "" .rego_file}}'
+    cmds:
+      - |
+        {{.OPA}} check {{.rego_file}}
+
+  opa-test:
+    desc: "Run rego test. Requires: rego_path:<relative path to rego file e.g. policies/iac/compliances/terraform.rego>"
+    silent: false
+    cmds:
+      - |
+        # If any violations are found, they will be printed out
+        {{.OPA}} eval --format pretty --data policies/iac  --input tmp/plan.json "data.iac.main.violations"
+      - |
+        # Check for budget violations
+        {{.OPA}} eval --format pretty --data policies/budget  --input tmp/cost.json "data.budget.deny"
+  
+### Networking Specfic Tasks
+  scaffold-vpc:
+    desc: "Scaffold a VPC workspace. Requires: account, vpc. Optional region, group. Recommended: cidr_block"
+    silent: true
+    vars:
+      account: '{{default "" .account}}'
+      region: '{{default "ap-southeast-1" .region}}'
+      vpc: '{{default "" .vpc}}'
+      cidr_block: '{{default "10.42.0.0/16" .cidr_block}}'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      KEY_PATH: '$(case ${TIER} in 1) echo "{{.account}}/{{.PROJECT}}" ;; 2) echo "{{.account}}/{{.PROJECT}}/{{.region}}" ;; 3) echo "{{.account}}/{{.PROJECT}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      RELATIVE_WS_PATH: '$(case "${TIER}" in 1) echo "../..";; 2) echo "../../..";; 3) echo "../../../../";; esac)'
+      RENDER: '{{.CMD}} run --platform {{ .PLATFORM }} --user $(id -u):$(id -g) --rm -it -v {{.PWD}}:/tf -w /tf {{.TEMPLATER}}'
+    cmds:
+      - |
+        # Check if required variables are set, some have default values
+        [ "{{.account}}" ]    || { echo "account is required."; exit 1; }
+        [ "{{.TIER}}" -ge 2 ] && [ -z "{{.region}}" ] && echo "region is required." && exit 1 || true
+        [ "{{.vpc}}" ]        || { echo "account is vpc."; exit 1; }
+
+        # Create VPC paths
+        [ ! -d "workspaces/{{.WS_PATH}}" ] && { echo "Workspace does not exists. Run `scaffold` before `scaffold-vpc` first."; exit 1; }
+        [ -d "workspaces/{{.WS_PATH}}/resources/vpcs/{{.vpc}}" ]  && { echo "VPC workspace already exists."; exit 1; }
+        [ -d "workspaces/{{.WS_PATH}}/resources/vpcs/{{.vpc}}" ]  || { mkdir -p workspaces/{{.WS_PATH}}/resources/vpcs/{{.vpc}}/security_groups; }
+        
+        [ -f "./tmp/CIDR.yaml" ] || touch ./tmp/CIDR.yaml
+        {{.YQ}} e '.CIDR_BLOCK = "{{.cidr_block}}"' -i ./tmp/CIDR.yaml
+        # Create files and populate from config templates         
+        cp -r ./base/starter/endpoints ./workspaces/{{.WS_PATH}}/resources/vpcs/{{.vpc}}/security_groups/endpoints
+        cp ./base/templates/vpcs/endpoints.yaml ./workspaces/{{.WS_PATH}}/resources/vpcs/{{.vpc}}/endpoints.yaml
+        {{.RENDER}} -c .=/tf/workspaces/{{.WS_PATH}}/config.yaml -d cidr=/tf/tmp/CIDR.yaml -f /tf/base/templates/vpcs/vpc_peering.yaml.tmpl -o /tf/workspaces/{{.WS_PATH}}/resources/vpcs/{{.vpc}}/vpc_peering.yaml
+        {{.RENDER}} -c .=/tf/workspaces/{{.WS_PATH}}/config.yaml -d cidr=/tf/tmp/CIDR.yaml -f /tf/base/templates/vpcs/route53_endpoints_resolver.yaml.tmpl -o /tf/workspaces/{{.WS_PATH}}/resources/vpcs/{{.vpc}}/route53_endpoints_resolver.yaml
+        {{.RENDER}} -c .=/tf/workspaces/{{.WS_PATH}}/config.yaml -d cidr=/tf/tmp/CIDR.yaml -f /tf/base/templates/vpcs/main.yaml.tmpl -o /tf/workspaces/{{.WS_PATH}}/resources/vpcs/{{.vpc}}/main.yaml
+        echo "VPC scaffold complete."
+
+  unscaffold-vpc:
+    desc: "Unscaffold a VPC workspace. Requires: account, vpc. Optional region, group"
+    silent: true
+    vars:
+      account: '{{default "" .account}}'
+      region: '{{default "ap-southeast-1" .region}}'
+      vpc: '{{default "" .vpc}}'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+    cmds:
+      - |
+        # Check if required variables are set, some have default values
+        [ "{{.account}}" ] || ( echo "ACCOUNT is required."; exit 1 )
+        [ "{{.TIER}}" -ge 2 ] && [ -z "{{.region}}" ] && echo "REGION is required." && exit 1 || true
+        [ "{{.vpc}}" ] || ( echo "VPC is required."; exit 1 )
+
+        # If does not exist, exit
+        [ -d "workspaces/{{.WS_PATH}}/resources/vpcs/{{.vpc}}" ] || { echo "VPC workspace does not exist."; exit 1; }
+        
+        # Remove VPC workspace
+        rm -rf workspaces/{{.WS_PATH}}/resources/vpcs/{{.vpc}}
+        echo "VPC workspace (workspaces/{{.WS_PATH}}/resources/vpcs/{{.vpc}}) unscaffolded."
+
+### Others
+  cloc:
+    desc: "Run cloc"
+    cmds:
+      - |
+        cloc --exclude-dir=.terraform,tmp,workspaces .

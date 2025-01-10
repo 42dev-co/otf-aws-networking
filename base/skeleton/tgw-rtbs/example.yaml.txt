@@ -1,0 +1,23 @@
+simple_tgw_rtb:
+  create: false 
+  transit_gateway_id: devops_sg_tgw
+
+  # Takes a list of format <transit_gateway_alias>-<vpc_attachment_alias> or <vpc_attachment_id>
+  vpc_attachments:
+    - devops_sg_tgw-devops_sg_vpc
+
+  # Need to disable default route table association and propagation first 
+  # 
+  # aws ec2 modify-transit-gateway \
+  # --transit-gateway-id tgw-abc1234567890def \
+  # --options "DefaultRouteTableAssociation=disable,DefaultRouteTablePropagation=disable"
+  #
+  # peering_attachments:
+  #   - devops_sg_tgw-staging_au_tgw
+  routes: 
+    to_redis_cloud:
+      destination_cidr_block: "10.100.100.0/24"
+      transit_gateway_attachment_id: tgw-attach-03fad1c672b5e0bac
+    to_anything_else:
+      destination_cidr_block: "10.0.0.0/8"
+      blackhole: true

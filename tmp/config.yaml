@@ -1,0 +1,7 @@
+ACCOUNT: staging
+ACCOUNT_ID: "050451372847"
+REGION: ap-southeast-1
+PROJECT: otf-iac-aws-networking
+DOMAIN: 
+TIER: 2
+KEY_PATH: staging/otf-iac-aws-networking/ap-southeast-1

@@ -1,0 +1,24 @@
+# VPC Peering
+#
+# VPC Peering requires requestor and acceptor to be first initiated by the requestor 
+# and the acceptor to accept the request. This can done automatically by the module 
+# by setting the acceptor to true. However, the route table for both VPCs will not be
+# updated automatically. You will need to update the route table manually.
+vpc_peering: {}
+#   requesters:
+#     example_vpc_peer1:
+#       peer_vpc_id: vpc-12345678901
+#       peer_region: ap-southeast-1
+#       peer_owner_id: "12345678901"
+#     example_vpc_peer2:
+#       peer_vpc_id: vpc-12345678902
+#       peer_region: ap-southeast-1
+#       peer_owner_id: "12345678902"
+#   accepters: 
+#     staging-staging-vpc:
+#       create: true
+#       vpc_peering_connection_id: pcx-0b2bc520c7272c63d
+#       peer_region: ap-southeast-1
+#    example_vpc_peer_requesters2:
+#      vpc_peering_connection_id: pcx-12345678901234564
+#      peer_region: ap-southeast-1

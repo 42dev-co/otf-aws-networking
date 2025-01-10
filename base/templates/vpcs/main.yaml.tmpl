@@ -1,0 +1,303 @@
+# Create VPC - set false to not create VPC
+create: true
+# Create Internet Gateway - set false to not create Internet Gateway
+create_internet_gateway: true
+# Attach Internet Gateway to VPC - set false to not attach Internet Gateway to VPC
+attached_internet_gateway_to_vpc: true
+
+# vpc regionial placement (auto-generated)
+region: "{{ .REGION }}"
+
+# Availability Zones definition
+# you alias the AZs to a, b, c, etc. for easier reference
+azs:
+  a: "{{ .REGION }}a"
+  b: "{{ .REGION }}b"
+  c: "{{ .REGION }}c"
+
+# VPC CIDR block (auto-generated)
+cidr_block: "{{ (datasource "cidr").CIDR_BLOCK }}"
+
+# Enable DNS support and DNS hostnames
+# Amazon-Provided DNS Server: AWS provides a DNS server at the base of the VPC network range (e.g., VPC_CIDR + 2). 
+# This DNS server allows instances within the VPC to resolve domain names to IP addresses
+enable_dns_support: true
+# determines whether instances launched within the VPC receive public DNS hostnames.
+# For example, an instance might have a hostname like ec2-203-0-113-25.compute-1.amazonaws.com.
+enable_dns_hostnames: true
+
+# Enable IPv6 for the VPC
+assign_generated_ipv6_cidr_block: true
+
+# Create NAT Gateways  
+# nat_gateways.create: true - Create all NAT gateways or none
+# nat_gateways.gateways: - Define NAT gateways
+# ```
+# <gateway_alias>:
+#   subnet: <subnet alias defined in subnets>
+#   eip: <true/false> - Allocate Elastic IP for the NAT gateway
+#   create: <true/false> - Create the NAT gateway
+# ```
+nat_gateways: 
+  create: true
+  gateways: 
+    nat1a:
+      subnet: public_subnet_a_1
+      eip: true
+      create: false
+
+    # nat1b:
+    #   subnet: public_subnet_b_2
+    #   eip: true
+    # nat1c:  
+    #   subnet: public_subnet_c_3
+    #   eip: true
+
+# Subnets definition
+# ```
+# <subnet_name>:
+#   cidr_block: "<cidr_block>"
+#   az: <az alias defined in azs>
+#   nacl: <nacl alias defined in nacls>
+#   internet_gateway_exclusion_mode: "<mode>" # allow-bidirectional, allow-egress. 
+#                                             # Note required if account setting is does not enable BPA(Block Public Access). 
+#                                             # See resources/settings/main.yaml for BPA settings
+#   tags: # optional  
+#     <key>: "<value>"
+# ```
+
+{{ define "prefix" }}
+{{- $parts := (datasource "cidr").CIDR_BLOCK | strings.Split "." -}}
+{{- index $parts 0 }}.{{ index $parts 1 -}}
+{{ end }}
+
+
+subnets: {}
+# Below is an example of how to define subnets
+#   public_subnet_a_1:
+#     cidr_block: "{{ template "prefix" . }}.0.0/24"
+#     az: a
+#     nacl: public
+#     internet_gateway_exclusion_mode: "allow-bidirectional"
+
+#   public_subnet_b_2:
+#     cidr_block: "{{ template "prefix" . }}.4.0/24"
+#     az: b
+#     nacl: public
+#     internet_gateway_exclusion_mode: "allow-bidirectional"
+
+#   public_subnet_c_3:
+#     cidr_block: "{{ template "prefix" . }}.8.0/24"
+#     az: c
+#     nacl: public
+#     internet_gateway_exclusion_mode: "allow-bidirectional"
+      
+#   private_subnet_a_1:
+#     cidr_block: "{{ template "prefix" . }}.12.0/24"
+#     az: a
+#     nacl: private
+#     internet_gateway_exclusion_mode: "allow-egress"
+    
+#   private_subnet_b_2:
+#     cidr_block: "{{ template "prefix" . }}.16.0/24"
+#     az: b
+#     nacl: private
+#     internet_gateway_exclusion_mode: "allow-egress"
+
+#   private_subnet_c_3:
+#     cidr_block: "{{ template "prefix" . }}.20.0/24"
+#     az: c
+#     nacl: private
+#     internet_gateway_exclusion_mode: "allow-egress"
+
+#   db_subnet_a_1:
+#     cidr_block: "{{ template "prefix" . }}.24.0/24"
+#     az: a
+#     nacl: database
+
+#   db_subnet_b_2:
+#     cidr_block: "{{ template "prefix" . }}.28.0/24"
+#     az: b
+#     nacl: database
+
+#   db_subnet_c_3:
+#     cidr_block: "{{ template "prefix" . }}.32.0/24"
+#     az: c
+#     nacl: database
+
+# Network ACLs definition
+# ```
+# <nacl_name>:
+#   tags: # optional
+#   ingress:
+#     <rule_number>:
+#       protocol: "<protocol>"
+#       rule_action: "<action>"
+#       cidr_block: "<cidr_block>"
+#       from_port: <port>
+#       to_port: <port>
+#       ipv6_cidr_block: "<ipv6_cidr_block>"
+#   egress:
+
+# Below is an example of how to define and configure network ACLs, you may change the rules as needed
+nacls:
+  public:
+    tags:
+      Description: "ACL for all subnets in public zone"
+    ingress:
+      1: 
+        protocol: all
+        rule_action: allow
+        cidr_block: "0.0.0.0/0"
+      2:
+        protocol: all
+        rule_action: allow
+        ipv6_cidr_block: "::/0"
+    egress:
+      1:
+        protocol: all
+        rule_action: allow
+        cidr_block: "0.0.0.0/0"
+      2:
+        protocol: all
+        rule_action: allow
+        ipv6_cidr_block: "::/0"
+  private:
+    tags:
+      Description: "ACL for private subnets"
+    ingress:
+      1:
+        protocol: all
+        rule_action: allow
+        cidr_block: "{{ (datasource "cidr").CIDR_BLOCK }}"
+      2:
+        protocol: tcp
+        rule_action: allow
+        cidr_block: "0.0.0.0/0"
+        from_port: 1024
+        to_port: 65535
+      3:
+        protocol: udp
+        rule_action: allow
+        cidr_block: "0.0.0.0/0"
+        from_port: 1024
+        to_port: 65535
+      4:
+        protocol: tcp
+        rule_action: allow
+        ipv6_cidr_block: "::/0"
+        from_port: 1024
+        to_port: 65535
+      5:
+        protocol: udp
+        rule_action: allow
+        ipv6_cidr_block: "::/0"
+        from_port: 1024
+        to_port: 65535
+    egress:
+      1:
+        protocol: all
+        rule_action: allow
+        cidr_block: "{{ (datasource "cidr").CIDR_BLOCK }}"
+      2:
+        protocol: tcp
+        rule_action: allow
+        cidr_block: "{{ (datasource "cidr").CIDR_BLOCK }}"
+        from_port: 80
+        to_port: 80
+      3:
+        protocol: tcp
+        rule_action: allow
+        cidr_block: "0.0.0.0/0"
+        from_port: 443
+        to_port: 443
+      4:
+        protocol: all
+        rule_action: allow
+        cidr_block: "0.0.0.0/0"
+        from_port: 53
+        to_port: 53
+      5:
+        protocol: tcp
+        rule_action: allow
+        ipv6_cidr_block: "::/0"
+        from_port: 80
+        to_port: 80
+      6:
+        protocol: tcp
+        rule_action: allow
+        ipv6_cidr_block: "::/0"
+        from_port: 443
+        to_port: 443
+      7:
+        protocol: all
+        rule_action: allow
+        ipv6_cidr_block: "::/0"
+        from_port: 53
+        to_port: 53
+  database:
+    tags:
+      Description: "ACL for database subnets"
+    ingress:
+      1:
+        protocol: all
+        rule_action: allow
+        cidr_block: "{{ (datasource "cidr").CIDR_BLOCK }}"
+    egress:
+      1:
+        protocol: all
+        rule_action: allow
+        cidr_block: "{{ (datasource "cidr").CIDR_BLOCK }}"
+
+# Route Tables definition
+# ```
+# <route_table_name>:
+#   subnets:
+#     - <subnet alias defined in subnets> - to associate the route table with
+#   routes:
+#     <route_name>: # does not have impact on the route table, and key id for the route
+#       destination_cidr_block: "<cidr_block>"
+#       destination_ipv6_cidr_block: "<ipv6_cidr_block>"
+#       destination_prefix_list_id: "<prefix_list_id>"
+#       carrier_gateway_id: "<carrier_gateway_id>"
+#       egress_only_gateway_id: "<egress_only_gateway_id>"
+#       gateway_id: "<gateway_id>"                               - if gateway_id is `default`, it will automatically associate with the internet gateway
+#       nat_gateway_id: "<nat_gateway_id>"                       - nat_gateway_id can an alias defined in nat_gateways but only for the same vpc. 
+#                                                                  Meaning, you can't use nat_gateway_id from another vpc.
+#       local_gateway_id: "<local_gateway_id>"
+#       network_interface_id: "<network_interface_id>"
+#       transit_gateway_id: "<transit_gateway_id>"               - transit_gateway_id can an alias defined in transit_gateways 
+#       vpc_endpoint_id: "<vpc_endpoint_id>"
+#       vpc_peering_connection_id: "<vpc_peering_connection_id>" - vpc_peering_connection_id can an alias defined in vpc_peering, 
+#                                                                  but only for the same vpc. Meaning, you can't use vpc_peering_connection_id from another vpc
+# ```
+
+route_tables: {}
+#  public-rtb:
+#    subnets: 
+#      - public_subnet_a_1
+#      - public_subnet_b_2
+#      - public_subnet_c_3
+#    routes: 
+#      default_route: 
+#        destination_cidr_block: "0.0.0.0/0"
+#        gateway_id: default
+#      default_ipv6_route: 
+#        destination_ipv6_cidr_block: "::/0"
+#        gateway_id: default
+#  private-rtb:
+#    subnets: 
+#      - private_subnet_a_1
+#      - private_subnet_b_2
+#      - private_subnet_c_3
+#    routes: {}
+#       default_route: 
+#         destination_cidr_block: "0.0.0.0/0"
+#         nat_gateway_id: nat1a
+
+
+
+
+
+
+

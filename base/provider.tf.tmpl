@@ -1,0 +1,18 @@
+terraform {
+  backend "s3" {
+    bucket = "<replace with your bucket name>"
+    key    = "{{ .KEY_PATH }}/state.tfstate"
+    region = "ap-southeast-1"
+    profile = "devops"
+    dynamodb_table = ""
+  }
+}
+
+provider "aws" {
+  region = var.region
+  profile = "{{.ACCOUNT}}"
+}
+
+variable "region" {
+  default = "ap-southeast-1"
+}

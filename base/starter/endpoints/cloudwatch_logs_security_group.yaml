@@ -1,0 +1,9 @@
+cloudwatch_logs_security_group:
+  description: "Security group for CloudWatch Logs VPC Endpoint"
+  ingress_with_cidr_blocks:
+    - from_port: 443
+      to_port: 443
+      protocol: tcp
+      cidr_blocks : "10.0.0.0/8"
+  egress_rules:
+    - "all-all"

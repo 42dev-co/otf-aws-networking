@@ -1,0 +1,15 @@
+devops_sg_tgw:
+  tgw_id: tgw-0152fe2717eaac1b2
+  share_arn: "arn:aws:ram:ap-southeast-1:1234567890:resource-share/76917871-29c8-4a53-a10e-26cd83af8e6c"
+  
+  accept: false
+
+  vpc_attachments:
+    # Initiated from VPC that is accepting the TGW
+    staging_sg_vpc:
+      create: false
+      vpc_id: staging_sg
+      subnet_ids:
+        - staging_sg-private_subnet_a_1
+        - staging_sg-private_subnet_b_2
+        - staging_sg-private_subnet_c_3
