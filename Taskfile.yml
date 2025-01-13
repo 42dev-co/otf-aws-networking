@@ -59,7 +59,7 @@ tasks:
       account: '{{default "" .account}}'
       region: '{{default "ap-southeast-1" .region}}'
       group: '{{default "" .group}}'
-      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.group}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
       COMMAND: '{{.CMD}} run --platform {{.PLATFORM}} --rm -it -e USER=$(id -u) -e GROUP=$(id -g) -e AWS_PROFILE={{.account}} -v {{.HOME}}/.aws:/root/.aws -v {{.HOME}}/.gitconfig:/root/.gitconfig -v {{.PWD}}:/tf -v {{.PWD}}/local_modules:/tf/workspaces/{{.WS_PATH}}/local_modules -w /tf/workspaces/{{.WS_PATH}} --entrypoint \"\" {{.IMAGE}}'
     cmds:
       - |
@@ -92,7 +92,7 @@ tasks:
       account: '{{default "" .account}}'
       region: '{{default "ap-southeast-1" .region}}'
       group: '{{default "" .group}}'
-      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.group}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
       COMMAND: '{{.CMD}} run --platform {{.PLATFORM}} --rm -it -e USER=$(id -u) -e GROUP=$(id -g) -e AWS_PROFILE={{.account}} -v {{.HOME}}/.aws:/root/.aws -v {{.HOME}}/.gitconfig:/root/.gitconfig -v {{.PWD}}:/tf -v {{.PWD}}/local_modules:/tf/workspaces/{{.WS_PATH}}/local_modules -w /tf/workspaces/{{.WS_PATH}} --entrypoint \"\" {{.IMAGE}}'
     cmds:
       - |
@@ -118,7 +118,7 @@ tasks:
       account: '{{default "" .account}}'
       region: '{{default "ap-southeast-1" .region}}'
       group: '{{default "" .group}}'
-      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.group}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
       COMMAND: '{{.CMD}} run --platform {{.PLATFORM}} --rm -it -e USER=$(id -u) -e GROUP=$(id -g) -e AWS_PROFILE={{.account}} -v {{.HOME}}/.aws:/root/.aws -v {{.HOME}}/.gitconfig:/root/.gitconfig -v {{.PWD}}:/tf -v {{.PWD}}/local_modules:/tf/workspaces/{{.WS_PATH}}/local_modules -w /tf/workspaces/{{.WS_PATH}} --entrypoint \"\" {{.IMAGE}}'
     cmds:
       - |
@@ -174,7 +174,7 @@ tasks:
       account: '{{default "" .account}}'
       region: '{{default "ap-southeast-1" .region}}'
       group: '{{default "" .group}}'
-      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.group}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
       COMMAND: '{{.CMD}} run --platform {{.PLATFORM}} --rm -it -e USER=$(id -u) -e GROUP=$(id -g) -e AWS_PROFILE={{.account}} -v {{.HOME}}/.aws:/root/.aws -v {{.HOME}}/.gitconfig:/root/.gitconfig -v {{.PWD}}:/tf -v {{.PWD}}/local_modules:/tf/workspaces/{{.WS_PATH}}/local_modules -w /tf/workspaces/{{.WS_PATH}} --entrypoint \"\" {{.IMAGE}}'
     cmds:
       - |
@@ -264,7 +264,7 @@ tasks:
       account_id: '{{default "" .account_id}}'
       region: '{{default "ap-southeast-1" .region}}'
       group: '{{default "" .group}}'
-      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.group}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
       KEY_PATH: '$(case ${TIER} in 1) echo "{{.account}}/{{.PROJECT}}" ;; 2) echo "{{.account}}/{{.PROJECT}}/{{.region}}" ;; 3) echo "{{.account}}/{{.PROJECT}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
       RELATIVE_WS_PATH: '$(case "${TIER}" in 1) echo "../..";; 2) echo "../../..";; 3) echo "../../../../";; esac)'
       RENDER: '{{.CMD}} run --platform {{ .PLATFORM }} --user $(id -u):$(id -g) --rm -it -v {{.PWD}}:/tf -w /tf {{.TEMPLATER}}'
@@ -294,7 +294,7 @@ tasks:
       account_id: '{{default "" .account_id}}'
       region: '{{default "ap-southeast-1" .region}}'
       group: '{{default "" .group}}'
-      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.group}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
       KEY_PATH: '$(case ${TIER} in 1) echo "{{.account}}/{{.PROJECT}}" ;; 2) echo "{{.account}}/{{.PROJECT}}/{{.region}}" ;; 3) echo "{{.account}}/{{.PROJECT}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
       RELATIVE_WS_PATH: '$(case "${TIER}" in 1) echo "../..";; 2) echo "../../..";; 3) echo "../../../../";; esac)'
       RENDER: '{{.CMD}} run --platform {{ .PLATFORM }} --user $(id -u):$(id -g) --rm -it -v {{.PWD}}:/tf -w /tf {{.TEMPLATER}}'
@@ -338,7 +338,7 @@ tasks:
       account: '{{default "" .account}}'
       region: '{{default "ap-southeast-1" .region}}'
       GROUP: '{{default "" .region}}'
-      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.group}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
     cmds:
       - |
         [ "{{.account}}" ] || ( echo "ACCOUNT is required."; exit 1 )
@@ -378,7 +378,7 @@ tasks:
       region: '{{default "ap-southeast-1" .region}}'
       vpc: '{{default "" .vpc}}'
       cidr_block: '{{default "10.42.0.0/16" .cidr_block}}'
-      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.group}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
       KEY_PATH: '$(case ${TIER} in 1) echo "{{.account}}/{{.PROJECT}}" ;; 2) echo "{{.account}}/{{.PROJECT}}/{{.region}}" ;; 3) echo "{{.account}}/{{.PROJECT}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
       RELATIVE_WS_PATH: '$(case "${TIER}" in 1) echo "../..";; 2) echo "../../..";; 3) echo "../../../../";; esac)'
       RENDER: '{{.CMD}} run --platform {{ .PLATFORM }} --user $(id -u):$(id -g) --rm -it -v {{.PWD}}:/tf -w /tf {{.TEMPLATER}}'
@@ -411,7 +411,7 @@ tasks:
       account: '{{default "" .account}}'
       region: '{{default "ap-southeast-1" .region}}'
       vpc: '{{default "" .vpc}}'
-      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.region}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
+      WS_PATH: '$(case ${TIER} in 1) echo "{{.account}}" ;; 2) echo "{{.account}}/{{.region}}" ;; 3) echo "{{.account}}/{{.region}}/{{.group}}" ;; *) echo "Unsupported tier" && exit 1 ;; esac)'
     cmds:
       - |
         # Check if required variables are set, some have default values
