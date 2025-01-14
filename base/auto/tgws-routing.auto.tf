@@ -47,7 +47,7 @@ resource "aws_ec2_transit_gateway_route_table_association" "this" {
   ]
 }
 
-resource "aws_ec2_transit_gateway_route" "example" {
+resource "aws_ec2_transit_gateway_route" "this" {
   for_each = local.tgw_route_tables_routes
 
   destination_cidr_block         = each.value.destination_cidr_block
